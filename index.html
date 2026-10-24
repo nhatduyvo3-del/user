@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Headlock DD - System Core</title>
+<style>
+  /* ===== RESET & FONTS ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  
+  body {
+    min-height: 100vh;
+    background-color: #050505;
+    background-image: 
+      radial-gradient(circle at 15% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 85% 30%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+      linear-gradient(0deg, #050505 0%, #111115 100%);
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Hạt nhiễu (Noise) */
+  body::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* ===== CARD ===== */
+  .card-wrapper {
+    position: relative;
+    z-index: 1;
+    width: 420px;
+    max-width: calc(100vw - 24px);
+    border-radius: 24px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.02) 60%, rgba(255,255,255,0.15));
+    animation: cardIn 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .card-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 25px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    background-size: 200% 100%;
+    animation: borderScan 4s linear infinite;
+    z-index: -1;
+    opacity: 0.5;
+  }
+  @keyframes borderScan { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  .card {
+    background: rgba(15, 15, 18, 0.65);
+    backdrop-filter: blur(24px) saturate(120%);
+    -webkit-backdrop-filter: blur(24px) saturate(120%);
+    border-radius: 23px;
+    padding: 28px 26px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  
+  .brand-logo {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    position: relative;
+    background: #000;
+  }
+  .brand-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .brand-text { display: flex; flex-direction: column; }
+  .brand-name { font-size: 16px; font-weight: 800; letter-spacing: 0.5px; color: #fff; }
+  .brand-sub { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+  .ping {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; color: #aaa;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 6px 12px; border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-variant-numeric: tabular-nums;
+  }
+  .ping-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #555; transition: 0.3s;
+  }
+  .ping.good .ping-dot { background: #fff; box-shadow: 0 0 8px #fff; }
+  .ping.bad .ping-dot { background: #ff4444; box-shadow: 0 0 8px #ff4444; }
+
+  /* ===== PANELS ===== */
+  .panel { display: none; animation: fadeIn 0.4s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .section-title {
+    font-size: 12px; color: #aaa; margin-bottom: 16px;
+    letter-spacing: 1px; text-transform: uppercase; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::before {
+    content: ''; width: 4px; height: 4px; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 8px #fff;
+  }
+
+  /* ===== INPUT ===== */
+  .input-group { display: flex; gap: 10px; margin-bottom: 16px; }
+  .input-wrap { flex: 1; position: relative; }
+  
+  .input-wrap input {
+    width: 100%;
+    padding: 16px 18px;
+    padding-right: 45px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    font-size: 15px;
+    letter-spacing: 2px;
+    outline: none;
+    transition: 0.3s;
+    font-family: 'Courier New', monospace;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+  }
+  .input-wrap input:focus {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05), inset 0 2px 5px rgba(0,0,0,0.5);
+  }
+  .input-wrap input::placeholder { color: #444; font-family: 'Segoe UI', sans-serif; letter-spacing: 1px; }
+  
+  .key-status-icon {
+    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+    font-size: 18px; opacity: 0; transition: 0.3s;
+  }
+  .key-status-icon.show { opacity: 1; }
+
+  /* ===== BUTTONS ===== */
+  .btn {
+    padding: 16px 20px; border-radius: 14px; border: none;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-paste {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ccc;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .btn-paste:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+  .btn-activate {
+    width: 100%;
+    background: #fff;
+    color: #000;
+    font-size: 15px; font-weight: 800;
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15);
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-activate:hover { background: #e0e0e0; box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25); }
+  .btn-activate:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(0,0,0,0.2); border-top-color: #000;
+    border-radius: 50%; animation: spin 0.6s linear infinite; display: none;
+  }
+  .btn-activate.loading .spinner { display: block; }
+  .btn-activate.loading .btn-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== STATUS ===== */
+  .status {
+    margin-top: 16px; padding: 12px; border-radius: 12px;
+    font-size: 13px; text-align: center; font-weight: 500;
+    display: none; animation: fadeIn 0.3s;
+  }
+  .status.show { display: block; }
+  .status.ok { color: #fff; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
+  .status.err { color: #ff6666; background: rgba(255, 102, 102, 0.1); border: 1px solid rgba(255, 102, 102, 0.2); }
+
+  /* ===== FEATURES ===== */
+  .user-info {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px; background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 16px;
+    margin-bottom: 24px;
+  }
+  .user-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;
+    font-size: 20px; border: 1px solid rgba(255,255,255,0.15);
+  }
+  .user-details { flex: 1; }
+  .user-name { font-size: 15px; font-weight: 700; color: #fff; }
+  .user-key { font-size: 11px; color: #888; font-family: 'Courier New', monospace; margin-top: 3px; }
+  .user-badge {
+    font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 8px;
+    background: #fff; color: #000; letter-spacing: 1px;
+  }
+
+  .feature-card {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px; background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px;
+    margin-bottom: 12px; transition: 0.3s;
+  }
+  .feature-card:hover { background: rgba(255, 255, 255, 0.04); }
+  .feature-card.on { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.05); }
+
+  .feature-left { display: flex; align-items: center; gap: 14px; }
+  .feature-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    transition: 0.3s;
+  }
+  .feature-card.on .feature-icon {
+    background: #fff; color: #000; box-shadow: 0 0 15px rgba(255,255,255,0.3);
+  }
+  .feature-label { font-size: 15px; font-weight: 600; color: #ddd; }
+  .feature-card.on .feature-label { color: #fff; }
+  .feature-desc { font-size: 11px; color: #777; margin-top: 2px; }
+
+  /* TOGGLE */
+  .toggle {
+    width: 48px; height: 26px; background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px; position: relative; cursor: pointer;
+    transition: 0.3s; border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; border-radius: 50%; background: #666;
+    transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .toggle.on { background: rgba(255, 255, 255, 0.2); }
+  .toggle.on::after { left: 24px; background: #fff; box-shadow: 0 0 10px #fff; }
+
+  .info-box {
+    padding: 14px; background: rgba(255, 255, 255, 0.02);
+    border-left: 2px solid #555; border-radius: 0 8px 8px 0;
+    font-size: 12px; color: #999; line-height: 1.6; margin-bottom: 20px;
+  }
+
+  .btn-logout {
+    width: 100%; padding: 14px; background: transparent;
+    color: #ff6666; border: 1px solid rgba(255, 102, 102, 0.2);
+    border-radius: 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: 0.2s;
+  }
+  .btn-logout:hover { background: rgba(255, 102, 102, 0.1); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #fff; color: #000;
+    padding: 12px 24px; border-radius: 30px;
+    font-size: 13px; font-weight: 700;
+    z-index: 100; transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); opacity: 0;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="card-wrapper">
+  <div class="card">
+    
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        <div class="brand-logo">
+          <!-- ẢNH ANIME BASE64 ĐÃ ĐƯỢC NHÚNG -->
+          <img id="animeLogo" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCADIAMgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q==" alt="Logo">
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">HEADLOCK DD</div>
+          <div class="brand-sub">System Access</div>
+        </div>
+      </div>
+      <div class="ping" id="pingDisplay">
+        <span class="ping-dot"></span>
+        <span id="pingText">-- ms</span>
+      </div>
+    </div>
+
+    <!-- TAB 1: LOGIN -->
+    <div id="tabLogin" class="panel active">
+      <div class="section-title">Xác thực bản quyền</div>
+      
+      <div class="input-group">
+        <div class="input-wrap">
+          <input type="text" id="keyInput" placeholder="DD-XXXX-XXXX-XX" maxlength="14" autocomplete="off" spellcheck="false">
+          <span class="key-status-icon" id="keyIcon">✓</span>
+        </div>
+        <button class="btn btn-paste" onclick="pasteKey()">Dán</button>
+      </div>
+      
+      <button class="btn btn-activate" id="btnActivate" onclick="activateKey()">
+        <span class="btn-text">KÍCH HOẠT NGAY</span>
+        <span class="spinner"></span>
+      </button>
+
+      <div class="status" id="status"></div>
+    </div>
+
+    <!-- TAB 2: FEATURES -->
+    <div id="tabFeatures" class="panel">
+      
+      <div class="user-info">
+        <div class="user-avatar">👤</div>
+        <div class="user-details">
+          <div class="user-name">Authorized User</div>
+          <div class="user-key" id="displayKey">DD-XXXX-XXXX-XX</div>
+        </div>
+        <div class="user-badge">PRO</div>
+      </div>
+
+      <div class="section-title">Bảng Điều Khiển</div>
+
+      <div class="feature-card" id="featureAim">
+        <div class="feature-left">
+          <div class="feature-icon">🎯</div>
+          <div>
+            <div class="feature-label">Aimpoint</div>
+            <div class="feature-desc">Tùy chỉnh điểm ngắm</div>
+          </div>
+        </div>
+        <div class="toggle" id="toggleAim" onclick="toggleAim()"></div>
+      </div>
+
+      <div class="info-box">
+        <strong>Hệ thống:</strong> Đây là giao diện mô phỏng (Demo). Không can thiệp vào bất kỳ tiến trình game nào.
+      </div>
+
+      <button class="btn-logout" onclick="logout()">ĐĂNG XUẤT KEY</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   FALLBACK: Nếu ảnh Base64 lỗi, thử dùng link online
+   ============================================================ */
+const animeLogo = document.getElementById('animeLogo');
+animeLogo.onerror = function() {
+  // Nếu ảnh base64 bị lỗi, thử tải từ link dự phòng
+  this.src = 'https://i.pinimg.com/736x/8a/a4/07/8aa407ca505e52f32e9aef0e2356ef12.jpg';
+};
+
+/* ============================================================
+   CẤU HÌNH
+   ============================================================ */
+const CONFIG = {
+  VALID_KEYS: ['DD-1234-5678-90', 'DD-ABCD-EFGH-12', 'DD-DEMO-TEST-01'],
+  STORAGE_KEY: 'headlock_dd_session'
+};
+
+/* ============================================================
+   PING GIẢ LẬP
+   ============================================================ */
+setInterval(() => {
+  const pingEl = document.getElementById('pingDisplay');
+  const pingText = document.getElementById('pingText');
+  const ping = Math.floor(Math.random() * 30) + 12;
+  pingText.textContent = ping + ' ms';
+  pingEl.className = 'ping ' + (ping < 35 ? 'good' : 'bad');
+}, 2500);
+
+/* ============================================================
+   XỬ LÝ ĐỊNH DẠNG KEY (ĐÃ FIX LỖI)
+   ============================================================ */
+const keyInput = document.getElementById('keyInput');
+const keyIcon = document.getElementById('keyIcon');
+
+keyInput.addEventListener('input', (e) => {
+  let raw = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (raw.startsWith('DD')) raw = raw.slice(2);
+  raw = raw.slice(0, 10);
+
+  let formatted = 'DD-';
+  if (raw.length > 0) formatted += raw.slice(0, 4);
+  if (raw.length > 4) formatted += '-' + raw.slice(4, 8);
+  if (raw.length > 8) formatted += '-' + raw.slice(8, 10);
+
+  e.target.value = formatted;
+  
+  const isValid = /^DD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{2}$/.test(formatted);
+  if (isValid) {
+    keyIcon.textContent = '✓'; keyIcon.style.color = '#fff'; keyIcon.classList.add('show');
+  } else if (formatted.length > 3) {
+    keyIcon.textContent = '✕'; keyIcon.style.color = '#ff6666'; keyIcon.classList.add('show');
+  } else {
+    keyIcon.classList.remove('show');
+  }
+});
+
+/* ============================================================
+   CÁC CHỨC NĂNG
+   ============================================================ */
+async function pasteKey() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      keyInput.value = text;
+      keyInput.dispatchEvent(new Event('input'));
+      showToast('Đã dán mã');
+    }
+  } catch (err) {
+    showToast('Lỗi: Không thể đọc Clipboard');
+  }
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status show ' + type;
+}
+
+async function activateKey() {
+  const key = keyInput.value;
+  const btn = document.getElementById('btnActivate');
+  
+  if (!/^DD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{2}$/.test(key)) {
+    setStatus('Sai định dạng Key', 'err');
+    return;
+  }
+
+  btn.classList.add('loading');
+  btn.disabled = true;
+  setStatus('Đang kết nối máy chủ...', '');
+
+  await new Promise(r => setTimeout(r, 1200));
+
+  if (CONFIG.VALID_KEYS.includes(key)) {
+    setStatus('Xác thực thành công!', 'ok');
+    localStorage.setItem(CONFIG.STORAGE_KEY, key);
+    setTimeout(() => {
+      document.getElementById('tabLogin').classList.remove('active');
+      document.getElementById('tabFeatures').classList.add('active');
+      document.getElementById('displayKey').textContent = key;
+    }, 800);
+  } else {
+    setStatus('Key không hợp lệ hoặc đã hết hạn', 'err');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function logout() {
+  localStorage.removeItem(CONFIG.STORAGE_KEY);
+  document.getElementById('tabFeatures').classList.remove('active');
+  document.getElementById('tabLogin').classList.add('active');
+  keyInput.value = '';
+  keyIcon.classList.remove('show');
+  document.getElementById('status').classList.remove('show');
+  document.getElementById('toggleAim').classList.remove('on');
+  document.getElementById('featureAim').classList.remove('on');
+  showToast('Đã đăng xuất');
+}
+
+function toggleAim() {
+  const t = document.getElementById('toggleAim');
+  const c = document.getElementById('featureAim');
+  t.classList.toggle('on');
+  c.classList.toggle('on', t.classList.contains('on'));
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+const savedKey = localStorage.getItem(CONFIG.STORAGE_KEY);
+if (savedKey && CONFIG.VALID_KEYS.includes(savedKey)) {
+  document.getElementById('tabLogin').classList.remove('active');
+  document.getElementById('tabFeatures').classList.add('active');
+  document.getElementById('displayKey').textContent = savedKey;
+}
+</script>
+</body>
+</html>
